@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "905728409505",
+    "project_id": "uts-oculus",
+    "storage_bucket": "uts-oculus.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:905728409505:android:8afeaf4f522ad2cabf95e0",
+        "android_client_info": {
+          "package_name": "com.uts.oculus"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqGV3aNWNVeLymSAjo3zil6HA7Tjk7WY8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
