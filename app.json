@@ -47,6 +47,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "development": {
+      "developmentClient": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "uts-oculus-mobile"
+      }
     }
   }
 }

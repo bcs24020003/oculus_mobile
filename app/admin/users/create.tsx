@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -8,11 +8,12 @@ import {
   ScrollView, 
   ActivityIndicator,
   Alert,
-  Switch 
+  Switch,
+  Modal 
 } from 'react-native';
 import { router } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
-import { getAuth, createUserWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, updateProfile, signOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, doc, setDoc, collection, query, where, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -30,6 +31,20 @@ export default function CreateUserAccount() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // 用于管理员重新登录的状态
+  const [adminPassword, setAdminPassword] = useState('');
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const currentUserEmail = useRef('');
+  const newUserData = useRef<{
+    fullName: string;
+    email: string;
+    password: string;
+    studentId: string;
+    department: string;
+    program: string;
+    isAdmin: boolean;
+  } | null>(null);
   
   const validateInputs = (): boolean => {
     if (!fullName.trim()) {
@@ -91,36 +106,35 @@ export default function CreateUserAccount() {
     }
   };
   
-  const handleCreateAccount = async () => {
-    if (!validateInputs()) return;
-    
-    const isDuplicateId = await checkDuplicateStudentId();
-    if (!isDuplicateId) return;
-    
+  const completeAccountCreation = async () => {
     try {
       setLoading(true);
       const db = getFirestore();
       const auth = getAuth();
       
-      // 保存当前登录用户的凭据
-      const currentUserEmail = auth.currentUser?.email;
-      const currentUserUid = auth.currentUser?.uid;
-            
+      // 保存当前登录的管理员邮箱
+      currentUserEmail.current = auth.currentUser?.email || '';
+      
+      // 确保newUserData.current不为null
+      if (!newUserData.current) {
+        throw new Error('用户数据不存在');
+      }
+      
       // 创建用户认证
       const userCredential = await createUserWithEmailAndPassword(
         auth,
-        email,
-        password
+        newUserData.current.email,
+        newUserData.current.password
       );
       
       const newUserUid = userCredential.user.uid;
 
       // 根据用户角色存储到不同的集合
-      if (isAdmin) {
+      if (newUserData.current.isAdmin) {
         // 存储到 users 集合
         await setDoc(doc(db, 'users', newUserUid), {
-          email,
-          fullName: fullName || '',
+          email: newUserData.current.email,
+          fullName: newUserData.current.fullName || '',
           role: 'admin',
           createdAt: serverTimestamp(),
           lastUpdated: serverTimestamp()
@@ -128,11 +142,11 @@ export default function CreateUserAccount() {
       } else {
         // 存储到 students 集合
         await setDoc(doc(db, 'students', newUserUid), {
-          email,
-          fullName: fullName || '',
-          studentId: studentId || '',
-          department: department || '',
-          program: program || '',
+          email: newUserData.current.email,
+          fullName: newUserData.current.fullName || '',
+          studentId: newUserData.current.studentId || '',
+          department: newUserData.current.department || '',
+          program: newUserData.current.program || '',
           role: 'student',
           isVerified: false,
           createdAt: serverTimestamp(),
@@ -140,28 +154,70 @@ export default function CreateUserAccount() {
         });
       }
       
-      // 显示成功消息的同时，尝试让管理员恢复登录状态
-      Alert.alert(
-        'Success',
-        'Account created successfully',
-        [
-          {
-            text: 'OK',
-            onPress: async () => {
-              // 重置表单但不重载页面
-              resetForm();
-              // 移除重新导航操作
-              // router.replace('/admin/users/create');
+      // 立即切换回管理员账号
+      try {
+        await signInWithEmailAndPassword(auth, currentUserEmail.current, adminPassword);
+        console.log('已恢复管理员登录状态');
+        
+        // 显示成功消息
+        Alert.alert(
+          '成功',
+          '账号创建成功',
+          [
+            {
+              text: '确定',
+              onPress: () => {
+                // 重置表单但不重载页面
+                resetForm();
+              }
             }
-          }
-        ]
-      );
-    } catch (error: any) {
-      console.error('Error creating account:', error);
-      Alert.alert('Error', error.message || 'Failed to create account');
+          ]
+        );
+      } catch (signInError) {
+        console.error('重新登录管理员账号失败:', signInError);
+        Alert.alert(
+          '警告',
+          '已创建新账号，但无法恢复到您的管理员账号。请手动退出并重新登录。',
+          [
+            {
+              text: '退出登录',
+              onPress: async () => {
+                await signOut(auth);
+                router.replace('/auth/sign-in');
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('创建账号时出错:', error);
+      Alert.alert('错误', error instanceof Error ? error.message : '创建账号失败');
     } finally {
+      setShowPasswordModal(false);
+      setAdminPassword('');
       setLoading(false);
     }
+  };
+  
+  const handleCreateAccount = async () => {
+    if (!validateInputs()) return;
+    
+    const isDuplicateId = await checkDuplicateStudentId();
+    if (!isDuplicateId) return;
+    
+    // 保存要创建的用户数据
+    newUserData.current = {
+      fullName,
+      email,
+      password,
+      studentId,
+      department,
+      program,
+      isAdmin
+    };
+    
+    // 显示密码确认弹窗
+    setShowPasswordModal(true);
   };
 
   // 重置表单函数
@@ -325,6 +381,67 @@ export default function CreateUserAccount() {
           )}
         </TouchableOpacity>
       </View>
+      
+      {/* 管理员密码确认弹窗 */}
+      <Modal
+        visible={showPasswordModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowPasswordModal(false);
+          setAdminPassword('');
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>管理员密码确认</Text>
+            <Text style={styles.modalSubtitle}>请输入您的管理员密码以便在创建账号后恢复您的登录状态</Text>
+            
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                value={adminPassword}
+                onChangeText={setAdminPassword}
+                placeholder="输入您的密码"
+                placeholderTextColor="#94A3B8"
+                secureTextEntry={!showPassword}
+                autoFocus
+              />
+              <TouchableOpacity 
+                style={styles.eyeIcon}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <FontAwesome name={showPassword ? "eye-slash" : "eye"} size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={() => {
+                  setShowPasswordModal(false);
+                  setAdminPassword('');
+                }}
+                disabled={loading}
+              >
+                <Text style={styles.cancelButtonText}>取消</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.confirmButton, !adminPassword ? styles.disabledButton : null]}
+                onPress={completeAccountCreation}
+                disabled={!adminPassword || loading}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>确认</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -441,5 +558,53 @@ const styles = StyleSheet.create({
   },
   eyeIcon: {
     padding: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 16,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 20,
+  },
+  confirmButton: {
+    backgroundColor: '#1E3A8A',
+    padding: 10,
+    paddingHorizontal: 15,
+    borderRadius: 6,
+  },
+  confirmButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  disabledButton: {
+    backgroundColor: '#CBD5E1',
   },
 }); 

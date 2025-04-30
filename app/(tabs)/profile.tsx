@@ -37,12 +37,42 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     fetchProfile();
+    
+    // Ensure that admin status is checked every time the page opens
+    const checkAdminStatusInterval = setInterval(() => {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (user) {
+        checkIfUserIsAdmin(user.uid).then(status => {
+          if (status !== isAdmin) {
+            console.log('🔄 Admin status changed, updating state:', status);
+            setIsAdmin(status);
+          }
+        });
+      }
+    }, 3000); // Check every 3 seconds
+    
+    return () => {
+      clearInterval(checkAdminStatusInterval);
+    };
   }, []);
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
     fetchProfile();
   }, []);
+
+  // Check if user is admin function
+  const checkIfUserIsAdmin = async (userId: string) => {
+    try {
+      const db = getFirestore();
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      return userDoc.exists() && userDoc.data().isAdmin === true;
+    } catch (error) {
+      console.error("Error checking admin status:", error);
+      return false;
+    }
+  };
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -59,29 +89,35 @@ export default function ProfileScreen() {
         return;
       }
       
+      // Check if user is admin
+      const adminStatus = await checkIfUserIsAdmin(currentUser.uid);
+      console.log('✅ Admin status check result:', adminStatus);
+      setIsAdmin(adminStatus);
+      
       const db = getFirestore();
       
-      // First check if user is an admin
-      const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-      if (userDoc.exists() && userDoc.data().isAdmin) {
-        const userData = userDoc.data();
-        setIsAdmin(true);
-        setProfile({
-          id: userDoc.id,
-          fullName: userData.fullName || userData.displayName || 'Admin User',
-          studentId: 'ADMIN',
-          email: userData.email || currentUser.email || '',
-          department: 'Administration',
-          program: 'System Administration',
-          photoUrl: userData.photoUrl || null,
-          username: userData.username || '',
-        });
+      if (adminStatus) {
+        // If admin, get data from users collection
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setProfile({
+            id: userDoc.id,
+            fullName: userData.fullName || userData.displayName || 'Admin User',
+            studentId: 'ADMIN',
+            email: userData.email || currentUser.email || '',
+            department: 'Administration',
+            program: 'System Administration',
+            photoUrl: userData.photoUrl || null,
+            username: userData.username || '',
+          });
+        }
         setLoading(false);
         setRefreshing(false);
         return;
       }
       
-      // If not an admin, fetch the student profile
+      // Non-admin user, get data from students collection
       const profileRef = doc(db, 'students', currentUser.uid);
       const profileSnap = await getDoc(profileRef);
       
@@ -92,7 +128,6 @@ export default function ProfileScreen() {
         };
         
         setProfile(profileData);
-        setIsAdmin(false);
       } else {
         // For demo purposes, use mock data if profile doesn't exist
         const mockProfile: StudentProfile = {
@@ -300,12 +335,36 @@ export default function ProfileScreen() {
   };
 
   const navigateToViewID = () => {
+    console.log('Checking access to ID card, isAdmin:', isAdmin);
+    console.log('Profile studentId:', profile?.studentId);
+    
+    // Multiple checks to ensure admin users cannot access ID card
+    if (isAdmin || profile?.studentId === 'ADMIN' || !profile?.studentId) {
+      console.log('Access denied: Admin user trying to access ID card');
+      Alert.alert(
+        'Access Restricted',
+        'Admin users cannot access the student ID card function',
+        [{ text: 'OK' }],
+        { cancelable: false }
+      );
+      return;
+    }
+    
+    // Only students can reach this point
+    console.log('Access granted: Student accessing ID card');
     router.push('/profile/id-card' as any);
   };
 
   const navigateToScanner = () => {
     router.push('/profile/scanner' as any);
   };
+
+  // Force add admin status badge for debugging
+  const adminStatusBadge = isAdmin === true ? (
+    <View style={styles.debugBadge}>
+      <Text style={styles.debugBadgeText}>ADMIN MODE</Text>
+    </View>
+  ) : null;
 
   if (loading) {
     return (
@@ -340,8 +399,25 @@ export default function ProfileScreen() {
     );
   }
 
+  // Log admin status before rendering
+  console.log('⚠️ Final isAdmin status before rendering:', isAdmin);
+  
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      {/* Debug header only in development mode */}
+      <View style={styles.debugHeader}>
+        <Text style={styles.debugText}>isAdmin: {String(isAdmin)}</Text>
+        <Text style={styles.debugText}>studentId: {profile?.studentId || 'none'}</Text>
+        <TouchableOpacity 
+          style={styles.debugButton}
+          onPress={() => console.log('DEBUG - Profile:', profile, 'isAdmin:', isAdmin)}
+        >
+          <Text style={styles.debugButtonText}>Log Debug</Text>
+        </TouchableOpacity>
+      </View>
+      
+      {adminStatusBadge}
+      
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 10) }]}>
         <Image 
           source={require('../../assets/images/uts-logo-new.png')}
@@ -469,6 +545,7 @@ export default function ProfileScreen() {
             )}
             
             <View style={styles.actionsContainer}>
+              {/* Edit Profile Button - Always shown */}
               <TouchableOpacity 
                 style={styles.actionButton}
                 onPress={navigateToEditProfile}
@@ -477,6 +554,7 @@ export default function ProfileScreen() {
                 <Text style={styles.actionButtonText}>Edit Profile</Text>
               </TouchableOpacity>
               
+              {/* Change Password Button - Always shown */}
               <TouchableOpacity 
                 style={[styles.actionButton, styles.passwordButton]}
                 onPress={navigateToChangePassword}
@@ -484,6 +562,17 @@ export default function ProfileScreen() {
                 <FontAwesome name="lock" size={18} color="#FFFFFF" />
                 <Text style={styles.actionButtonText}>Change Password</Text>
               </TouchableOpacity>
+
+              {/* STUDENT ID BUTTON - ONLY SHOWN IF NOT ADMIN */}
+              {(!isAdmin && profile?.studentId && profile.studentId !== 'ADMIN') && (
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.idCardButton]}
+                  onPress={navigateToViewID}
+                >
+                  <FontAwesome name="id-card" size={18} color="#FFFFFF" />
+                  <Text style={styles.actionButtonText}>View ID Card</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -658,6 +747,10 @@ const styles = StyleSheet.create({
   passwordButton: {
     backgroundColor: '#2563EB',
   },
+  idCardButton: {
+    backgroundColor: '#2563EB',
+    marginTop: 10,
+  },
   actionButtonText: {
     color: '#FFFFFF',
     fontWeight: '600',
@@ -692,5 +785,46 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  debugBadge: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'red',
+    padding: 4,
+    zIndex: 9999,
+    borderRadius: 4,
+  },
+  debugBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  debugHeader: {
+    backgroundColor: '#FFEBEE',
+    padding: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFCDD2',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    paddingHorizontal: 10,
+  },
+  debugText: {
+    fontSize: 10,
+    color: '#B71C1C',
+    fontFamily: 'monospace',
+  },
+  debugButton: {
+    backgroundColor: '#FFCDD2',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  debugButtonText: {
+    fontSize: 10,
+    color: '#B71C1C',
+    fontFamily: 'monospace',
   },
 }); 
