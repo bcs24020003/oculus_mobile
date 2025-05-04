@@ -16,33 +16,33 @@ export default function AdminLayout() {
       
       if (!currentUser) {
         // If user is not logged in, redirect to sign-in
-        console.log('用户未登录，重定向到登录页面');
+        console.log('User not logged in, redirecting to login page');
         router.replace('/auth/sign-in');
         return;
       }
       
       try {
         // Check if user has admin privileges
-        console.log('检查用户管理员权限，UID:', currentUser.uid);
+        console.log('Checking user admin permissions, UID:', currentUser.uid);
         const db = getFirestore();
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
         
-        console.log('用户数据:', userDoc.exists() ? userDoc.data() : '不存在');
+        console.log('User data:', userDoc.exists() ? userDoc.data() : 'does not exist');
         
         if (!userDoc.exists() || userDoc.data().role !== 'admin') {
-          // 如果用户不是管理员，显示一个提示而不是自动重定向
+          // If user is not an admin, show a notification instead of auto-redirecting
           setIsAdmin(false);
           setIsVerifyingAdmin(false);
           return;
         }
         
         // User is verified as admin
-        console.log('用户是管理员，允许访问管理员界面');
+        console.log('User is admin, allowing access to admin interface');
         setIsAdmin(true);
         setIsVerifyingAdmin(false);
       } catch (error) {
-        console.error('验证管理员状态时出错:', error);
-        // 出错时也不自动重定向，让用户自己决定
+        console.error('Error verifying admin status:', error);
+        // On error, don't auto-redirect, let the user decide
         setIsAdmin(false);
         setIsVerifyingAdmin(false);
       }
@@ -61,7 +61,7 @@ export default function AdminLayout() {
     );
   }
 
-  // 如果用户不是管理员，显示无权限提示
+  // If user is not an admin, show access denied message
   if (!isAdmin) {
     return (
       <View style={styles.container}>
@@ -130,8 +130,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#64748B',
     textAlign: 'center',
-    marginBottom: 24,
     paddingHorizontal: 30,
+    marginBottom: 24,
   },
   buttonContainer: {
     marginTop: 16,

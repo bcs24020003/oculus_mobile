@@ -59,91 +59,91 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!username || !password) {
-      Alert.alert('错误', '请填写所有字段');
+      Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
     setLoading(true);
     try {
-      console.log('正在尝试登录...', { usernameOrId: username });
+      console.log('Attempting to log in...', { usernameOrId: username });
       
-      // 用于演示的测试用户
+      // Demo test user
       if (username === 'BCS24020003' || username === 'student@example.com') {
         await createTestUser();
-        // 创建/确保测试用户存在后，使用这些凭据登录
+        // After creating/ensuring test user exists, login with these credentials
         const auth = getAuth();
-        console.log('使用测试用户凭据登录:', { email: 'student@example.com' });
+        console.log('Logging in with test user credentials:', { email: 'student@example.com' });
         await signInWithEmailAndPassword(auth, 'student@example.com', 'password123');
         
-        console.log('测试用户登录成功，正在导航...');
+        console.log('Test user login successful, navigating...');
         router.replace('/(tabs)/home');
         return;
       }
       
-      // 处理正常登录流程
-      // 检查输入是否为学生ID
+      // Handle normal login flow
+      // Check if input is a student ID
       const isStudentId = /^BCS\d+$/.test(username);
       let email = username;
       
-      console.log('登录方式:', isStudentId ? '学生ID' : '邮箱');
+      console.log('Login method:', isStudentId ? 'Student ID' : 'Email');
 
-      // 如果输入的是学生ID，在Firestore中查找对应的邮箱
+      // If input is a student ID, look up the corresponding email in Firestore
       if (isStudentId) {
         const db = getFirestore();
         const studentsCollection = collection(db, 'students');
         const q = query(studentsCollection, where('studentId', '==', username));
         
-        console.log('正在查找学生ID对应的邮箱...');
+        console.log('Looking up email for student ID...');
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
-          throw new Error('未找到该学生ID，请检查后重试。');
+          throw new Error('Student ID not found, please check and try again.');
         }
 
-        // 从第一个匹配的文档中获取邮箱
+        // Get email from the first matching document
         email = querySnapshot.docs[0].data().email;
-        console.log('找到学生邮箱:', { email });
+        console.log('Found student email:', { email });
         
         if (!email) {
-          throw new Error('找到学生记录但没有关联的邮箱，请联系管理员。');
+          throw new Error('Student record found but no associated email, please contact administrator.');
         }
       }
 
-      // 使用邮箱和密码登录
+      // Login with email and password
       const auth = getAuth();
-      console.log('正在尝试登录Firebase:', { email });
+      console.log('Attempting to login to Firebase:', { email });
       await signInWithEmailAndPassword(auth, email, password);
       
-      console.log('登录成功，正在导航...');
+      console.log('Login successful, navigating...');
       router.replace('/(tabs)/home');
     } catch (error: any) {
-      console.error('登录错误:', error);
+      console.error('Login error:', error);
       
       let errorMessage = error.message;
-      // 记录详细的错误信息
-      console.error('登录失败:', { 
+      // Log detailed error information
+      console.error('Login failed:', { 
         code: error.code, 
         message: error.message,
         credentials: { username, passwordLength: password?.length || 0 }
       });
       
       if (error.code === 'auth/invalid-email') {
-        errorMessage = '无效的邮箱格式，请检查后重试。';
+        errorMessage = 'Invalid email format, please check and try again.';
       } else if (error.code === 'auth/user-not-found') {
-        errorMessage = '未找到该邮箱的账户，请先注册。';
+        errorMessage = 'No account found with this email, please register first.';
       } else if (error.code === 'auth/wrong-password') {
-        errorMessage = '密码不正确，请重试。';
+        errorMessage = 'Incorrect password, please try again.';
       } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = '登录尝试次数过多，请稍后再试或重置密码。';
+        errorMessage = 'Too many login attempts, please try again later or reset your password.';
       } else if (error.code === 'auth/user-disabled') {
-        errorMessage = '此账户已被禁用，请联系管理员。';
+        errorMessage = 'This account has been disabled, please contact administrator.';
       } else if (error.code === 'auth/network-request-failed') {
-        errorMessage = '网络错误，请检查您的连接并重试。';
+        errorMessage = 'Network error, please check your connection and try again.';
       } else if (error.code === 'auth/invalid-credential') {
-        errorMessage = '无效的凭据，请检查您的邮箱和密码。';
+        errorMessage = 'Invalid credentials, please check your email and password.';
       }
       
-      Alert.alert('登录失败', errorMessage);
+      Alert.alert('Login Failed', errorMessage);
     } finally {
       setLoading(false);
     }

@@ -165,7 +165,7 @@ export default function NewsScreen() {
               resizeMode="contain"
             />
           </View>
-          <Text style={styles.headerTitle}>News & Announcements</Text>
+          <Text style={styles.headerTitle}>Announcements</Text>
         </View>
         
         <View style={styles.loadingContainer}>
@@ -193,7 +193,7 @@ export default function NewsScreen() {
               resizeMode="contain"
             />
           </View>
-          <Text style={styles.headerTitle}>News & Announcements</Text>
+          <Text style={styles.headerTitle}>Announcements</Text>
         </View>
         
         <View style={styles.errorContainer}>
@@ -220,13 +220,13 @@ export default function NewsScreen() {
             resizeMode="contain"
           />
         </View>
-        <Text style={styles.headerTitle}>News & Announcements</Text>
+        <Text style={styles.headerTitle}>Announcements</Text>
       </View>
       
       {announcements.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Image 
-            source={{ uri: PLACEHOLDER_IMAGES.emptyNews }}
+            source={{ uri: PLACEHOLDER_IMAGES.announcement }}
             style={styles.emptyImage}
             resizeMode="contain"
           />

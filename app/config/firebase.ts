@@ -50,6 +50,7 @@ auth.onAuthStateChanged((user) => {
 });
 
 const db = getFirestore(app);
-const storage = getStorage(app);
+// Initialize storage with explicit bucket URL from Firebase console
+const storage = getStorage(app, "gs://uts-oculus.firebasestorage.app");
 
 export { app, auth, db, storage }; 

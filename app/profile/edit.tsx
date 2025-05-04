@@ -19,9 +19,6 @@ interface StudentProfile {
   photoUrl?: string;
   createdAt?: string;
   username?: string;
-  dateOfBirth?: string;
-  mailingAddress?: string;
-  nric?: string;
 }
 
 export default function EditProfileScreen() {
@@ -30,9 +27,8 @@ export default function EditProfileScreen() {
   const [uploading, setUploading] = useState(false);
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [email, setEmail] = useState('');
-  const [nric, setNric] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
-  const [mailingAddress, setMailingAddress] = useState('');
+  const [department, setDepartment] = useState('');
+  const [program, setProgram] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -65,9 +61,8 @@ export default function EditProfileScreen() {
         
         setProfile(profileData);
         setEmail(profileData.email || '');
-        setNric(profileData.nric || '');
-        setDateOfBirth(profileData.dateOfBirth || '');
-        setMailingAddress(profileData.mailingAddress || '');
+        setDepartment(profileData.department || '');
+        setProgram(profileData.program || '');
       } else {
         setError('Profile not found');
       }
@@ -96,17 +91,15 @@ export default function EditProfileScreen() {
       const db = getFirestore();
       const profileRef = doc(db, 'students', user.uid);
       await updateDoc(profileRef, {
-        nric: nric,
-        dateOfBirth: dateOfBirth,
-        mailingAddress: mailingAddress
+        department: department,
+        program: program
       });
       
       // Update local state
       setProfile({
         ...profile,
-        nric: nric,
-        dateOfBirth: dateOfBirth,
-        mailingAddress: mailingAddress
+        department: department,
+        program: program
       });
       
       Alert.alert('Success', 'Profile updated successfully', [
@@ -298,36 +291,24 @@ export default function EditProfileScreen() {
         </View>
         
         <View style={styles.formGroup}>
-          <Text style={styles.label}>NRIC :</Text>
+          <Text style={styles.label}>Department :</Text>
           <TextInput
             style={styles.input}
-            value={nric}
-            onChangeText={setNric}
-            placeholder="Enter your NRIC"
+            value={department}
+            onChangeText={setDepartment}
+            placeholder="Enter your department"
             placeholderTextColor="#A0AEC0"
           />
         </View>
         
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Date of birth :</Text>
+          <Text style={styles.label}>Program :</Text>
           <TextInput
             style={styles.input}
-            value={dateOfBirth}
-            onChangeText={setDateOfBirth}
-            placeholder="YYYY-MM-DD"
+            value={program}
+            onChangeText={setProgram}
+            placeholder="Enter your program/course"
             placeholderTextColor="#A0AEC0"
-          />
-        </View>
-        
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Mailing Address :</Text>
-          <TextInput
-            style={styles.input}
-            value={mailingAddress}
-            onChangeText={setMailingAddress}
-            placeholder="Enter your mailing address"
-            placeholderTextColor="#A0AEC0"
-            multiline
           />
         </View>
         

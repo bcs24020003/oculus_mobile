@@ -261,16 +261,16 @@ export default function ProfileScreen() {
       // Update profile in Firestore
       const db = getFirestore();
       
-      // 根据用户角色选择正确的集合
+      // Select the correct collection based on user role
       if (isAdmin) {
-        // 管理员数据应该更新到 users 集合
+        // Admin data should be updated in the users collection
         const profileRef = doc(db, 'users', user.uid);
         await updateDoc(profileRef, {
           photoUrl: downloadURL
         });
         console.log('Updated admin profile photo in users collection');
       } else {
-        // 普通用户/学生数据应该更新到 students 集合
+        // Regular user/student data should be updated in the students collection
         const profileRef = doc(db, 'students', user.uid);
         await updateDoc(profileRef, {
           photoUrl: downloadURL
@@ -404,18 +404,6 @@ export default function ProfileScreen() {
   
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      {/* Debug header only in development mode */}
-      <View style={styles.debugHeader}>
-        <Text style={styles.debugText}>isAdmin: {String(isAdmin)}</Text>
-        <Text style={styles.debugText}>studentId: {profile?.studentId || 'none'}</Text>
-        <TouchableOpacity 
-          style={styles.debugButton}
-          onPress={() => console.log('DEBUG - Profile:', profile, 'isAdmin:', isAdmin)}
-        >
-          <Text style={styles.debugButtonText}>Log Debug</Text>
-        </TouchableOpacity>
-      </View>
-      
       {adminStatusBadge}
       
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 10) }]}>
@@ -481,69 +469,65 @@ export default function ProfileScreen() {
           
           <View style={styles.profileInfoContainer}>
             <View style={styles.infoSection}>
-              <Text style={styles.sectionTitle}>{isAdmin ? 'Admin Information' : 'Personal Information'}</Text>
+              <Text style={styles.sectionTitle}>{isAdmin ? 'Admin Information' : 'Student Information'}</Text>
               
-              <View style={styles.infoRow}>
-                <View style={styles.infoIconContainer}>
-                  <FontAwesome name="envelope" size={18} color="#1E3A8A" />
+              {isAdmin && (
+                <View style={styles.infoRow}>
+                  <View style={styles.infoIconContainer}>
+                    <FontAwesome name="envelope" size={18} color="#1E3A8A" />
+                  </View>
+                  <View style={styles.infoTextContainer}>
+                    <Text style={styles.infoLabel}>Email</Text>
+                    <Text style={styles.infoValue}>{profile?.email}</Text>
+                  </View>
                 </View>
-                <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoLabel}>Email</Text>
-                  <Text style={styles.infoValue}>{profile?.email}</Text>
-                </View>
-              </View>
+              )}
               
               {!isAdmin && (
                 <>
                   <View style={styles.infoRow}>
                     <View style={styles.infoIconContainer}>
-                      <FontAwesome name="id-card" size={18} color="#1E3A8A" />
+                      <FontAwesome name="id-badge" size={18} color="#1E3A8A" />
                     </View>
                     <View style={styles.infoTextContainer}>
-                      <Text style={styles.infoLabel}>NRIC</Text>
-                      <Text style={styles.infoValue}>{profile?.nric || 'Not provided'}</Text>
+                      <Text style={styles.infoLabel}>Student ID</Text>
+                      <Text style={styles.infoValue}>{profile?.studentId}</Text>
                     </View>
                   </View>
                   
                   <View style={styles.infoRow}>
                     <View style={styles.infoIconContainer}>
-                      <FontAwesome name="calendar" size={18} color="#1E3A8A" />
+                      <FontAwesome name="user" size={18} color="#1E3A8A" />
                     </View>
                     <View style={styles.infoTextContainer}>
-                      <Text style={styles.infoLabel}>Date of Birth</Text>
-                      <Text style={styles.infoValue}>{profile?.dateOfBirth || 'Not provided'}</Text>
+                      <Text style={styles.infoLabel}>Full Name</Text>
+                      <Text style={styles.infoValue}>{profile?.fullName}</Text>
                     </View>
                   </View>
                   
                   <View style={styles.infoRow}>
                     <View style={styles.infoIconContainer}>
-                      <FontAwesome name="home" size={18} color="#1E3A8A" />
+                      <FontAwesome name="university" size={18} color="#1E3A8A" />
                     </View>
                     <View style={styles.infoTextContainer}>
-                      <Text style={styles.infoLabel}>Address</Text>
-                      <Text style={styles.infoValue}>{profile?.mailingAddress || 'Not provided'}</Text>
+                      <Text style={styles.infoLabel}>Department</Text>
+                      <Text style={styles.infoValue}>{profile?.department || 'Not provided'}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.infoRow}>
+                    <View style={styles.infoIconContainer}>
+                      <FontAwesome name="graduation-cap" size={18} color="#1E3A8A" />
+                    </View>
+                    <View style={styles.infoTextContainer}>
+                      <Text style={styles.infoLabel}>Program</Text>
+                      <Text style={styles.infoValue}>{profile?.program || 'Not provided'}</Text>
                     </View>
                   </View>
                 </>
               )}
             </View>
 
-            {!isAdmin && (
-              <View style={styles.infoSection}>
-                <Text style={styles.sectionTitle}>Academic Information</Text>
-                
-                <View style={styles.infoRow}>
-                  <View style={styles.infoIconContainer}>
-                    <FontAwesome name="graduation-cap" size={18} color="#1E3A8A" />
-                  </View>
-                  <View style={styles.infoTextContainer}>
-                    <Text style={styles.infoLabel}>Program</Text>
-                    <Text style={styles.infoValue}>{profile?.program || 'Not provided'}</Text>
-                  </View>
-                </View>
-              </View>
-            )}
-            
             <View style={styles.actionsContainer}>
               {/* Edit Profile Button - Always shown */}
               <TouchableOpacity 
@@ -589,7 +573,8 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingBottom: 5,
+    marginBottom: 0,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
@@ -799,32 +784,5 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 10,
     fontWeight: 'bold',
-  },
-  debugHeader: {
-    backgroundColor: '#FFEBEE',
-    padding: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: '#FFCDD2',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    paddingHorizontal: 10,
-  },
-  debugText: {
-    fontSize: 10,
-    color: '#B71C1C',
-    fontFamily: 'monospace',
-  },
-  debugButton: {
-    backgroundColor: '#FFCDD2',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  debugButtonText: {
-    fontSize: 10,
-    color: '#B71C1C',
-    fontFamily: 'monospace',
   },
 }); 
