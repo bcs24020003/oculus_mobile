@@ -26,7 +26,7 @@ export default function HomeScreen() {
             const userData = userDoc.data();
             console.log('User data from users collection:', userData);
             setIsAdmin(userData.role === 'admin');
-            // 确保获取用户名称的所有可能途径
+            // Ensure all possible ways to get the user's name
             setUserName(userData.fullName || userData.displayName || userData.username || user.displayName || user.email?.split('@')[0] || 'User');
           } else {
             // Check student collection if not in users
@@ -34,19 +34,19 @@ export default function HomeScreen() {
             if (studentDoc.exists()) {
               const studentData = studentDoc.data();
               console.log('User data from students collection:', studentData);
-              // 确保获取学生名称的所有可能途径
+              // Ensure all possible ways to get the student's name
               setUserName(studentData.fullName || studentData.displayName || studentData.username || user.displayName || user.email?.split('@')[0] || 'Student');
               setIsAdmin(false);
             } else {
               console.log('User not found in any collection, using fallback name');
-              // 如果两个集合都没有，使用Auth数据中的信息
+              // If not in either collection, use info from Auth data
               setUserName(user.displayName || user.email?.split('@')[0] || 'User');
               setIsAdmin(false);
             }
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
-          // 出错时使用备用方案
+          // Use fallback solution when error occurs
           setUserName(user.displayName || user.email?.split('@')[0] || 'User');
           setIsAdmin(false);
         }

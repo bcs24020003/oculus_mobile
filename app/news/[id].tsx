@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Image, Share } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { FontAwesome } from '@expo/vector-icons';
+import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { doc, getDoc } from 'firebase/firestore';
 import { getFirestore } from 'firebase/firestore';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
@@ -162,6 +162,28 @@ export default function NewsDetailScreen() {
     }
   };
 
+  const handleShareAnnouncement = async () => {
+    if (!announcement) return;
+    
+    try {
+      await Share.share({
+        message: `${announcement.title}\n\n${announcement.content}\n\nPosted by: ${announcement.postedBy || announcement.author || 'Admin'}\nDate: ${formatDate(announcement.date)}`,
+        title: announcement.title,
+      });
+    } catch (error) {
+      console.error('Error sharing announcement:', error);
+    }
+  };
+
+  // Helper function to format content with proper paragraphs
+  const formatContent = (content: string) => {
+    return content.split('\n\n').map((paragraph, index) => (
+      <Text key={index} style={styles.paragraph}>
+        {paragraph}
+      </Text>
+    ));
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -222,36 +244,51 @@ export default function NewsDetailScreen() {
           <FontAwesome name="arrow-left" size={20} color="#1E293B" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Announcement</Text>
-        <View style={styles.headerPlaceholder} />
+        <TouchableOpacity 
+          style={styles.shareButton}
+          onPress={handleShareAnnouncement}
+        >
+          <FontAwesome name="share-alt" size={20} color="#1E40AF" />
+        </TouchableOpacity>
       </View>
       
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {announcement.imageUrl && (
           <Image 
             source={{ uri: announcement.imageUrl }}
-            style={styles.image}
+            style={styles.coverImage}
             resizeMode="cover"
           />
         )}
         
-        <View style={styles.contentContainer}>
-          <Text style={styles.title}>{announcement.title}</Text>
-          
-          <View style={styles.metaContainer}>
+        <View style={styles.contentWrapper}>
+          <View style={styles.priorityContainer}>
             <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
               <Text style={styles.priorityText}>{getPriorityLabel(announcement.priority)}</Text>
             </View>
-            
-            <Text style={styles.dateText}>
-              {formatDate(announcement.date)}
-            </Text>
           </View>
           
-          <Text style={styles.authorText}>
-            Posted by: {announcement.postedBy || announcement.author || 'Admin'}
-          </Text>
+          <Text style={styles.title}>{announcement.title}</Text>
           
-          <Text style={styles.contentText}>{announcement.content}</Text>
+          <View style={styles.infoContainer}>
+            <View style={styles.infoRow}>
+              <MaterialIcons name="event" size={16} color="#64748B" />
+              <Text style={styles.infoText}>{formatDate(announcement.date)}</Text>
+            </View>
+            
+            <View style={styles.infoRow}>
+              <MaterialIcons name="person" size={16} color="#64748B" />
+              <Text style={styles.infoText}>
+                {announcement.postedBy || announcement.author || 'Admin'}
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.divider} />
+          
+          <View style={styles.contentContainer}>
+            {formatContent(announcement.content)}
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -272,6 +309,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',
+    elevation: 2,
   },
   backButton: {
     padding: 8,
@@ -283,6 +321,9 @@ const styles = StyleSheet.create({
   },
   headerPlaceholder: {
     width: 36,
+  },
+  shareButton: {
+    padding: 8,
   },
   loadingContainer: {
     flex: 1,
@@ -318,15 +359,64 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  content: {
-    flexGrow: 1,
-    padding: 16,
+  scrollView: {
+    flex: 1,
   },
-  image: {
+  coverImage: {
     width: '100%',
-    height: 200,
-    borderRadius: 8,
+    height: 220,
+  },
+  contentWrapper: {
+    padding: 16,
+    paddingTop: 24,
+    marginTop: 16,
+  },
+  priorityContainer: {
+    position: 'relative',
+    marginTop: 0,
     marginBottom: 16,
+    alignItems: 'flex-start',
+  },
+  priorityBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  priorityText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 16,
+    lineHeight: 32,
+  },
+  infoContainer: {
+    marginBottom: 16,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#64748B',
+    marginLeft: 8,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 16,
   },
   contentContainer: {
     backgroundColor: '#FFFFFF',
@@ -334,44 +424,14 @@ const styles = StyleSheet.create({
     padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 1,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 12,
-  },
-  metaContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  priorityBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  priorityText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  dateText: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  authorText: {
-    fontSize: 14,
-    color: '#64748B',
-    fontStyle: 'italic',
-  },
-  contentText: {
+  paragraph: {
     fontSize: 16,
     lineHeight: 24,
     color: '#334155',
+    marginBottom: 16,
   },
 }); 

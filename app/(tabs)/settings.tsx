@@ -60,12 +60,12 @@ export default function SettingsScreen() {
         const userDocSnap = await getDoc(userDocRef);
         
         if (userDocSnap.exists()) {
-          // 如果文档存在，直接更新
+          // If document exists, update it directly
           await updateDoc(userDocRef, {
             pushNotificationEnabled: value
           });
         } else {
-          // 如果文档不存在，创建新文档
+          // If document doesn't exist, create a new one
           await setDoc(userDocRef, {
             pushNotificationEnabled: value,
             uid: user.uid,
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerLogo: {
-    width: 100,
+    width: 120,
     height: 50,
   },
   profileName: {

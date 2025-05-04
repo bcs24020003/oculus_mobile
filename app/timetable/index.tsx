@@ -65,7 +65,7 @@ export default function TimetableScreen() {
       
       const db = getFirestore();
       
-      // 首先获取当前用户的学生信息
+      // First get the current user's student information
       const studentDoc = await getDoc(doc(db, 'students', currentUser.uid));
       if (!studentDoc.exists()) {
         console.log('No student record found for this user');
@@ -74,9 +74,9 @@ export default function TimetableScreen() {
         return;
       }
       
-      // 获取所有课程表数据
+      // Get all timetable data
       const schedulesRef = collection(db, 'schedules');
-      // 使用单一字段排序来避免复合索引错误
+      // Use single field sorting to avoid composite index errors
       const q = query(schedulesRef, orderBy('day'));
       const schedulesSnapshot = await getDocs(q);
       
@@ -87,18 +87,18 @@ export default function TimetableScreen() {
         return;
       }
       
-      // 处理课程表数据
+      // Process timetable data
       const fetchedClasses: ClassSession[] = [];
       schedulesSnapshot.forEach((doc) => {
         const data = doc.data();
         
-        // 检查课程信息的完整性
+        // Check completeness of course information
         if (!data.courseCode || !data.courseName || !data.day) {
           console.warn('Incomplete schedule data found for document:', doc.id);
-          return; // 跳过不完整的数据
+          return; // Skip incomplete data
         }
         
-        // 解析教室和建筑信息
+        // Parse room and building information
         let roomNumber = '';
         let buildingName = '';
         
@@ -108,7 +108,7 @@ export default function TimetableScreen() {
             buildingName = roomParts[0];
             roomNumber = roomParts[1];
           } else {
-            // 如果格式不匹配，就使用整个字符串作为房间号
+            // If format doesn't match, use the entire string as room number
             roomNumber = data.room;
           }
         }
@@ -146,9 +146,9 @@ export default function TimetableScreen() {
     await fetchTimetable();
   };
 
-  // 根据课程类型和代码确定课程类型
+  // Determine class type based on type and code
   const determineClassType = (type: string, courseCode: string): ClassSession['type'] => {
-    // 首先检查类型字段
+    // First check the type field
     if (type) {
       const normalizedType = type.toLowerCase();
       if (normalizedType.includes('lecture')) return 'Lecture';
@@ -157,7 +157,7 @@ export default function TimetableScreen() {
       if (normalizedType.includes('workshop')) return 'Workshop';
     }
     
-    // 如果类型字段不存在或未匹配，尝试从课程代码推断
+    // If type field doesn't exist or no match, try to infer from course code
     if (courseCode) {
       const normalizedCode = courseCode.toUpperCase();
       if (normalizedCode.includes('LAB')) return 'Lab';
@@ -166,7 +166,7 @@ export default function TimetableScreen() {
       if (normalizedCode.includes('LEC')) return 'Lecture';
     }
     
-    // 默认为讲座
+    // Default to Lecture
     return 'Lecture';
   };
 

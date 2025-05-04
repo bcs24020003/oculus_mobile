@@ -267,6 +267,7 @@ export default function CoursesScreen() {
         {/* Course Category Filter */}
         <View style={styles.filterContainer}>
           <ScrollView 
+            horizontal
             contentContainerStyle={styles.filtersRow}
             showsHorizontalScrollIndicator={false}
           >
@@ -435,7 +436,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 10,
     paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
@@ -581,9 +582,8 @@ const styles = StyleSheet.create({
   },
   filtersRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     paddingHorizontal: 0,
-    marginBottom: 10,
+    paddingVertical: 8,
   },
   categoryBadge: {
     paddingHorizontal: 6,

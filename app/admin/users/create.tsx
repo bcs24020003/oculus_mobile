@@ -32,7 +32,7 @@ export default function CreateUserAccount() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-  // 用于管理员重新登录的状态
+  // State for admin re-login
   const [adminPassword, setAdminPassword] = useState('');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const currentUserEmail = useRef('');
@@ -112,15 +112,15 @@ export default function CreateUserAccount() {
       const db = getFirestore();
       const auth = getAuth();
       
-      // 保存当前登录的管理员邮箱
+      // Save current admin email
       currentUserEmail.current = auth.currentUser?.email || '';
       
-      // 确保newUserData.current不为null
+      // Ensure newUserData.current is not null
       if (!newUserData.current) {
-        throw new Error('用户数据不存在');
+        throw new Error('User data does not exist');
       }
       
-      // 创建用户认证
+      // Create user authentication
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         newUserData.current.email,
@@ -129,9 +129,9 @@ export default function CreateUserAccount() {
       
       const newUserUid = userCredential.user.uid;
 
-      // 根据用户角色存储到不同的集合
+      // Store to different collections based on user role
       if (newUserData.current.isAdmin) {
-        // 存储到 users 集合
+        // Store to users collection
         await setDoc(doc(db, 'users', newUserUid), {
           email: newUserData.current.email,
           fullName: newUserData.current.fullName || '',
@@ -140,7 +140,7 @@ export default function CreateUserAccount() {
           lastUpdated: serverTimestamp()
         });
       } else {
-        // 存储到 students 集合
+        // Store to students collection
         await setDoc(doc(db, 'students', newUserUid), {
           email: newUserData.current.email,
           fullName: newUserData.current.fullName || '',
@@ -154,33 +154,33 @@ export default function CreateUserAccount() {
         });
       }
       
-      // 立即切换回管理员账号
+      // Immediately switch back to admin account
       try {
         await signInWithEmailAndPassword(auth, currentUserEmail.current, adminPassword);
-        console.log('已恢复管理员登录状态');
+        console.log('Admin login status restored');
         
-        // 显示成功消息
+        // Show success message
         Alert.alert(
-          '成功',
-          '账号创建成功',
+          'Success',
+          'Account created successfully',
           [
             {
-              text: '确定',
+              text: 'OK',
               onPress: () => {
-                // 重置表单但不重载页面
+                // Reset form without reloading page
                 resetForm();
               }
             }
           ]
         );
       } catch (signInError) {
-        console.error('重新登录管理员账号失败:', signInError);
+        console.error('Failed to log back in as admin:', signInError);
         Alert.alert(
-          '警告',
-          '已创建新账号，但无法恢复到您的管理员账号。请手动退出并重新登录。',
+          'Warning',
+          'New account created, but could not restore your admin account. Please manually log out and log back in.',
           [
             {
-              text: '退出登录',
+              text: 'Log Out',
               onPress: async () => {
                 await signOut(auth);
                 router.replace('/auth/sign-in');
@@ -190,8 +190,8 @@ export default function CreateUserAccount() {
         );
       }
     } catch (error) {
-      console.error('创建账号时出错:', error);
-      Alert.alert('错误', error instanceof Error ? error.message : '创建账号失败');
+      console.error('Error creating account:', error);
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to create account');
     } finally {
       setShowPasswordModal(false);
       setAdminPassword('');
@@ -205,7 +205,7 @@ export default function CreateUserAccount() {
     const isDuplicateId = await checkDuplicateStudentId();
     if (!isDuplicateId) return;
     
-    // 保存要创建的用户数据
+    // Save user data to be created
     newUserData.current = {
       fullName,
       email,
@@ -216,11 +216,11 @@ export default function CreateUserAccount() {
       isAdmin
     };
     
-    // 显示密码确认弹窗
+    // Show password confirmation dialog
     setShowPasswordModal(true);
   };
 
-  // 重置表单函数
+  // Reset form function
   const resetForm = () => {
     setFullName('');
     setEmail('');
@@ -229,7 +229,7 @@ export default function CreateUserAccount() {
     setStudentId('');
     setDepartment('');
     setProgram('');
-    // 保持 isAdmin 不变，方便连续创建同类型账户
+    // Keep isAdmin unchanged for continuous account creation of the same type
   };
 
   return (
@@ -382,7 +382,7 @@ export default function CreateUserAccount() {
         </TouchableOpacity>
       </View>
       
-      {/* 管理员密码确认弹窗 */}
+      {/* Admin password confirmation dialog */}
       <Modal
         visible={showPasswordModal}
         transparent
@@ -394,15 +394,15 @@ export default function CreateUserAccount() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>管理员密码确认</Text>
-            <Text style={styles.modalSubtitle}>请输入您的管理员密码以便在创建账号后恢复您的登录状态</Text>
+            <Text style={styles.modalTitle}>Admin Password Confirmation</Text>
+            <Text style={styles.modalSubtitle}>Please enter your admin password to restore your login status after account creation</Text>
             
             <View style={styles.passwordContainer}>
               <TextInput
                 style={styles.passwordInput}
                 value={adminPassword}
                 onChangeText={setAdminPassword}
-                placeholder="输入您的密码"
+                placeholder="Enter your password"
                 placeholderTextColor="#94A3B8"
                 secureTextEntry={!showPassword}
                 autoFocus
@@ -424,7 +424,7 @@ export default function CreateUserAccount() {
                 }}
                 disabled={loading}
               >
-                <Text style={styles.cancelButtonText}>取消</Text>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -435,7 +435,7 @@ export default function CreateUserAccount() {
                 {loading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.confirmButtonText}>确认</Text>
+                  <Text style={styles.confirmButtonText}>Confirm</Text>
                 )}
               </TouchableOpacity>
             </View>

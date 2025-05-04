@@ -435,7 +435,7 @@ export default function CourseManagement() {
     </View>
   );
   
-  // 根据课程类别获取显示名称
+  // Get display name based on course category
   const getCategoryDisplayName = (category: string) => {
     switch (category) {
       case 'core': return 'Core';
@@ -447,7 +447,7 @@ export default function CourseManagement() {
     }
   };
   
-  // 根据课程类别获取徽章样式
+  // Get badge style based on course category
   const getCategoryBadgeStyle = (category: string) => {
     switch (category) {
       case 'core': return styles.coreBadge;
@@ -459,7 +459,7 @@ export default function CourseManagement() {
     }
   };
   
-  // 计算每个分类的课程数量
+  // Calculate the number of courses in each category
   const getCategoryCounts = () => {
     const counts = {
       core: 0,

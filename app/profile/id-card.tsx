@@ -22,6 +22,7 @@ interface StudentProfile {
   createdAt?: string;
   username?: string;
   qrCodeUrl?: string;
+  barcodeType?: 'barcode' | 'qrcode';
 }
 
 export default function IDCardScreen() {
@@ -118,7 +119,7 @@ export default function IDCardScreen() {
       if (!permissionResult.granted) {
         Alert.alert(
           'Permission Required',
-          '您需要授予权限才能访问照片库上传二维码。'
+          'You need to grant permission to access photo library to upload barcode.'
         );
         return;
       }
@@ -126,8 +127,8 @@ export default function IDCardScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.5, // 降低质量以减小文件大小
+        aspect: [3, 1], // 条形码宽高比
+        quality: 0.5, // Reduce quality to decrease file size
       });
       
       if (!result.canceled && result.assets[0].uri) {
@@ -138,105 +139,126 @@ export default function IDCardScreen() {
           const user = auth.currentUser;
           
           if (!user) {
-            throw new Error('用户未登录');
+            throw new Error('User not logged in');
           }
           
-          // 获取图片信息
+          // Get file info
           const fileInfo = await FileSystem.getInfoAsync(result.assets[0].uri);
           
           if (!fileInfo.exists) {
-            throw new Error('文件不存在');
+            throw new Error('File does not exist');
           }
           
-          console.log('文件信息:', JSON.stringify(fileInfo, null, 2));
+          console.log('File info:', JSON.stringify(fileInfo, null, 2));
           
-          // 检查文件大小
+          // Check file size
           if (fileInfo.size && fileInfo.size > 5 * 1024 * 1024) {
-            console.log('警告: 文件大小超过5MB');
+            console.log('Warning: File size exceeds 5MB');
           }
           
           try {
-            // 使用超时控制器
+            // 处理图像，优化条形码显示效果
+            let processedUri = result.assets[0].uri;
+            try {
+              // 使用ImageManipulator优化图像以便更好地显示
+              const manipResult = await ImageManipulator.manipulateAsync(
+                result.assets[0].uri,
+                [
+                  { resize: { width: 750, height: 200 } }, // 调整尺寸为适合条形码的宽高比
+                  { crop: { originX: 0, originY: 0, width: 750, height: 200 } } // 裁剪为适合条形码的区域
+                ],
+                { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+              );
+              processedUri = manipResult.uri;
+              console.log('Image processed for barcode display');
+            } catch (manipError) {
+              console.error('Error processing image:', manipError);
+              // 如果处理失败，继续使用原始图像
+            }
+            
+            // Use timeout controller
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000);
             
-            // 直接转换为blob，不使用ImageManipulator
-            const response = await fetch(result.assets[0].uri, { signal: controller.signal });
+            // Convert directly to blob, don't use ImageManipulator
+            const response = await fetch(processedUri, { signal: controller.signal });
             clearTimeout(timeoutId);
             
             if (!response.ok) {
-              throw new Error(`获取失败，状态码: ${response.status}`);
+              throw new Error(`Fetch failed, status code: ${response.status}`);
             }
             
             const blob = await response.blob();
             
             if (!blob || blob.size === 0) {
-              throw new Error('无效的blob: 为空或大小为0');
+              throw new Error('Invalid blob: empty or size is 0');
             }
             
-            console.log('上传文件:');
-            console.log('- Blob大小:', blob.size);
-            console.log('- Blob类型:', blob.type);
+            console.log('Uploading file:');
+            console.log('- Blob size:', blob.size);
+            console.log('- Blob type:', blob.type);
             
-            // 初始化存储
+            // Initialize storage
             const storage = getStorage();
             
-            // 使用时间戳命名文件，避免缓存问题
+            // Use timestamp to name file, avoid caching issues
             const timestamp = new Date().getTime();
-            const storageRef = ref(storage, `student_qrcodes/${user.uid}_${timestamp}.jpg`);
+            const storageRef = ref(storage, `student_barcodes/${user.uid}_${timestamp}.jpg`);
             
-            // 添加元数据确保正确的内容类型
+            // Add metadata to ensure correct content type
             const metadata = {
               contentType: 'image/jpeg',
               cacheControl: 'no-cache',
             };
             
-            console.log('开始上传...');
+            console.log('Starting upload...');
             await uploadBytes(storageRef, blob, metadata);
-            console.log('上传完成');
+            console.log('Upload complete');
             
-            // 获取下载URL
+            // Get download URL
             const downloadURL = await getDownloadURL(storageRef);
-            console.log('获取到下载URL:', downloadURL);
+            console.log('Got download URL:', downloadURL);
             
-            // 更新个人资料
+            // Update profile
             const db = getFirestore();
             const profileRef = doc(db, 'students', user.uid);
             await updateDoc(profileRef, {
-              qrCodeUrl: downloadURL
+              qrCodeUrl: downloadURL,
+              barcodeType: 'barcode'
             });
             
-            // 更新本地状态
+            // Update local state
             setProfile({
               ...profile,
-              qrCodeUrl: downloadURL
+              qrCodeUrl: downloadURL,
+              barcodeType: 'barcode'
             });
             
-            Alert.alert('成功', '二维码上传成功');
+            Alert.alert('Success', '条形码上传成功');
           } catch (error: any) {
-            console.error('Blob转换/上传错误详情:', error);
+            console.error('Blob conversion/upload error details:', error);
             
             if (error.name === 'AbortError') {
-              throw new Error('上传超时 - 请重试');
+              throw new Error('Upload timeout - please retry');
             }
             
-            // 详细记录Firebase错误
+            // Log detailed Firebase errors
             if (error.code && error.code.includes('storage/')) {
-              console.error('Firebase存储错误代码:', error.code);
+              console.error('Firebase storage error code:', error.code);
             }
             
-            throw new Error(`处理图片失败: ${error.message || '未知错误'}`);
+            throw new Error(`Image processing failed: ${error.message || 'Unknown error'}`);
           }
         } catch (error: any) {
-          console.error('上传二维码错误:', error);
-          Alert.alert('错误', `上传失败: ${error.message || '请重试'}`);
+          console.error('Barcode upload error:', error);
+          Alert.alert('Error', `Upload failed: ${error.message || 'Please try again'}`);
         } finally {
           setUploading(false);
         }
       }
     } catch (error: any) {
-      console.error('选择图片错误:', error);
-      Alert.alert('错误', `选择图片失败: ${error.message || '请重试'}`);
+      console.error('Image selection error:', error);
+      Alert.alert('Error', `Failed to select image: ${error.message || 'Please try again'}`);
     }
   };
 
@@ -250,7 +272,7 @@ export default function IDCardScreen() {
       if (!permissionResult.granted) {
         Alert.alert(
           'Permission Required',
-          '您需要授予权限才能访问照片库上传证件照。'
+          'You need to grant permission to access photo library to upload ID photo.'
         );
         return;
       }
@@ -259,7 +281,7 @@ export default function IDCardScreen() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [3, 4],
-        quality: 0.5, // 降低质量以减小文件大小
+        quality: 0.5, // Reduce quality to decrease file size
       });
       
       if (!result.canceled && result.assets[0].uri) {
@@ -270,105 +292,105 @@ export default function IDCardScreen() {
           const user = auth.currentUser;
           
           if (!user) {
-            throw new Error('用户未登录');
+            throw new Error('User not logged in');
           }
           
-          // 获取图片信息
+          // Get file info
           const fileInfo = await FileSystem.getInfoAsync(result.assets[0].uri);
           
           if (!fileInfo.exists) {
-            throw new Error('文件不存在');
+            throw new Error('File does not exist');
           }
           
-          console.log('文件信息:', JSON.stringify(fileInfo, null, 2));
+          console.log('File info:', JSON.stringify(fileInfo, null, 2));
           
-          // 检查文件大小
+          // Check file size
           if (fileInfo.size && fileInfo.size > 5 * 1024 * 1024) {
-            console.log('警告: 文件大小超过5MB');
+            console.log('Warning: File size exceeds 5MB');
           }
           
           try {
-            // 使用超时控制器
+            // Use timeout controller
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000);
             
-            // 直接转换为blob，不使用ImageManipulator
+            // Convert directly to blob, don't use ImageManipulator
             const response = await fetch(result.assets[0].uri, { signal: controller.signal });
             clearTimeout(timeoutId);
             
             if (!response.ok) {
-              throw new Error(`获取失败，状态码: ${response.status}`);
+              throw new Error(`Fetch failed, status code: ${response.status}`);
             }
             
             const blob = await response.blob();
             
             if (!blob || blob.size === 0) {
-              throw new Error('无效的blob: 为空或大小为0');
+              throw new Error('Invalid blob: empty or size is 0');
             }
             
-            console.log('上传照片:');
-            console.log('- Blob大小:', blob.size);
-            console.log('- Blob类型:', blob.type);
+            console.log('Uploading photo:');
+            console.log('- Blob size:', blob.size);
+            console.log('- Blob type:', blob.type);
             
-            // 初始化存储
+            // Initialize storage
             const storage = getStorage();
             
-            // 使用时间戳命名文件，避免缓存问题
+            // Use timestamp to name file, avoid caching issues
             const timestamp = new Date().getTime();
             const storageRef = ref(storage, `student_photos/${user.uid}_${timestamp}.jpg`);
             
-            // 添加元数据确保正确的内容类型
+            // Add metadata to ensure correct content type
             const metadata = {
               contentType: 'image/jpeg',
               cacheControl: 'no-cache',
             };
             
-            console.log('开始上传...');
+            console.log('Starting upload...');
             await uploadBytes(storageRef, blob, metadata);
-            console.log('上传完成');
+            console.log('Upload complete');
             
-            // 获取下载URL
+            // Get download URL
             const downloadURL = await getDownloadURL(storageRef);
-            console.log('获取到下载URL:', downloadURL);
+            console.log('Got download URL:', downloadURL);
             
-            // 更新个人资料
+            // Update profile
             const db = getFirestore();
             const profileRef = doc(db, 'students', user.uid);
             await updateDoc(profileRef, {
               photoUrl: downloadURL
             });
             
-            // 更新本地状态
+            // Update local state
             setProfile({
               ...profile,
               photoUrl: downloadURL
             });
             
-            Alert.alert('成功', '证件照上传成功');
+            Alert.alert('Success', 'ID photo uploaded successfully');
           } catch (error: any) {
-            console.error('Blob转换/上传错误详情:', error);
+            console.error('Blob conversion/upload error details:', error);
             
             if (error.name === 'AbortError') {
-              throw new Error('上传超时 - 请重试');
+              throw new Error('Upload timeout - please retry');
             }
             
-            // 详细记录Firebase错误
+            // Log detailed Firebase errors
             if (error.code && error.code.includes('storage/')) {
-              console.error('Firebase存储错误代码:', error.code);
+              console.error('Firebase storage error code:', error.code);
             }
             
-            throw new Error(`处理图片失败: ${error.message || '未知错误'}`);
+            throw new Error(`Image processing failed: ${error.message || 'Unknown error'}`);
           }
         } catch (error: any) {
-          console.error('上传照片错误:', error);
-          Alert.alert('错误', `上传失败: ${error.message || '请重试'}`);
+          console.error('ID photo upload error:', error);
+          Alert.alert('Error', `Upload failed: ${error.message || 'Please try again'}`);
         } finally {
           setUploadingPhoto(false);
         }
       }
     } catch (error: any) {
-      console.error('选择图片错误:', error);
-      Alert.alert('错误', `选择图片失败: ${error.message || '请重试'}`);
+      console.error('Image selection error:', error);
+      Alert.alert('Error', `Failed to select image: ${error.message || 'Please try again'}`);
     }
   };
 
@@ -386,11 +408,11 @@ export default function IDCardScreen() {
           >
             <FontAwesome name="arrow-left" size={24} color="#1E293B" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>学生证</Text>
+          <Text style={styles.headerTitle}>Student ID Card</Text>
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1E3A8A" />
-          <Text style={styles.loadingText}>正在加载学生证...</Text>
+          <Text style={styles.loadingText}>Loading student ID card...</Text>
         </View>
       </SafeAreaView>
     );
@@ -406,7 +428,7 @@ export default function IDCardScreen() {
           >
             <FontAwesome name="arrow-left" size={24} color="#1E293B" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>学生证</Text>
+          <Text style={styles.headerTitle}>Student ID Card</Text>
         </View>
         <View style={styles.errorContainer}>
           <FontAwesome name="exclamation-circle" size={50} color="#EF4444" />
@@ -426,11 +448,11 @@ export default function IDCardScreen() {
           >
             <FontAwesome name="arrow-left" size={24} color="#1E293B" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>学生证</Text>
+          <Text style={styles.headerTitle}>Student ID Card</Text>
         </View>
         <View style={styles.errorContainer}>
           <FontAwesome name="user-times" size={50} color="#64748B" />
-          <Text style={styles.errorText}>无可用个人资料信息</Text>
+          <Text style={styles.errorText}>No available personal information</Text>
         </View>
       </SafeAreaView>
     );
@@ -445,7 +467,7 @@ export default function IDCardScreen() {
         >
           <FontAwesome name="arrow-left" size={24} color="#1E293B" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>学生证</Text>
+        <Text style={styles.headerTitle}>Student ID Card</Text>
       </View>
       
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -456,24 +478,22 @@ export default function IDCardScreen() {
         <View style={styles.idCardContainer}>
           <View style={styles.idCard}>
             <View style={styles.verticalIdStrip}>
-              {profile.studentId && profile.studentId.slice(0, 3).split('').map((char, index) => (
-                <Text key={`prefix-${index}`} style={styles.verticalIdChar}>{char}</Text>
-              ))}
-              <View style={styles.idNumberSpacer} />
-              {profile.studentId && profile.studentId.slice(3).split('').map((char, index) => (
-                <Text key={`suffix-${index}`} style={styles.verticalIdChar}>{char}</Text>
+              {profile.studentId && profile.studentId.split('').map((char, index) => (
+                <Text key={`char-${index}`} style={styles.verticalIdChar}>{char}</Text>
               ))}
             </View>
             <View style={styles.idCardContent}>
-              <View style={styles.logoContainer}>
-                <Image 
-                  source={require('../../assets/images/logo.png')} 
-                  style={styles.logo} 
-                  resizeMode="contain"
-                />
+              <View style={styles.logoSection}>
+                <View style={styles.logoContainer}>
+                  <Image 
+                    source={require('../../assets/images/logo.png')} 
+                    style={styles.logo} 
+                    resizeMode="contain"
+                  />
+                </View>
               </View>
               
-              <View style={styles.photoFrame}>
+              <View style={styles.photoSection}>
                 <TouchableOpacity 
                   style={styles.photoUploadContainer}
                   onPress={uploadProfileImage}
@@ -499,35 +519,28 @@ export default function IDCardScreen() {
                 </TouchableOpacity>
               </View>
               
-              <View style={styles.nameContainer}>
-                <Text style={styles.nameText} numberOfLines={1}>{profile.fullName.toUpperCase()}</Text>
-              </View>
-              
-              <View style={styles.barcodeContainer}>
-                <TouchableOpacity 
-                  style={styles.qrCodeContainer}
-                  onPress={uploadQrCode}
-                  disabled={uploading}
-                >
-                  {profile.qrCodeUrl ? (
-                    <Image 
-                      source={{ uri: profile.qrCodeUrl }} 
-                      style={styles.qrCode} 
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <>
-                      <FontAwesome name="qrcode" size={40} color="#CBD5E1" />
-                      <Text style={styles.uploadText}>Tap to upload QR code</Text>
-                    </>
-                  )}
-                  {uploading && (
-                    <View style={styles.uploadingOverlay}>
-                      <ActivityIndicator color="#FFFFFF" size="large" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-                <Text style={styles.barcodeText}>{profile.studentId}</Text>
+              <View style={styles.idBottomSection}>
+                <View style={styles.nameContainer}>
+                  <Text style={styles.nameText}>{profile.fullName.toUpperCase()}</Text>
+                </View>
+                
+                <View style={styles.barcodeContainer}>
+                  <View style={styles.barcodeFormatContainer}>
+                    {profile.qrCodeUrl ? (
+                      <Image 
+                        source={{ uri: profile.qrCodeUrl }} 
+                        style={styles.barcodeFormatImage} 
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <>
+                        <FontAwesome name="barcode" size={40} color="#CBD5E1" />
+                        <Text style={styles.uploadText}>Barcode not available</Text>
+                      </>
+                    )}
+                  </View>
+                  <Text style={styles.barcodeText}>{profile.studentId}</Text>
+                </View>
               </View>
             </View>
           </View>
@@ -644,53 +657,62 @@ const styles = StyleSheet.create({
     width: '15%',
     height: '100%',
     backgroundColor: '#9C27B0',
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingVertical: 10,
   },
   verticalIdChar: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 3,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: {width: 1, height: 1},
     textShadowRadius: 2,
-  },
-  idNumberSpacer: {
-    height: 20,
+    fontFamily: 'serif',
   },
   idCardContent: {
     flex: 1,
-    padding: 12,
+    padding: 8,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 15,
+  },
+  logoSection: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 5,
+  },
+  photoSection: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 5,
+    paddingBottom: 5,
+  },
+  idBottomSection: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flex: 1,
   },
   logoContainer: {
+    width: '80%',
     alignItems: 'center',
-    marginBottom: 10,
+    justifyContent: 'center',
   },
   logo: {
-    width: 90,
-    height: 90,
-  },
-  photoFrame: {
-    width: 140,
-    height: 160,
-    borderWidth: 0,
-    backgroundColor: '#F1F5F9',
-    overflow: 'hidden',
-    marginBottom: 15,
-    borderRadius: 4,
+    width: 100,
+    height: 100,
   },
   photoUploadContainer: {
-    width: '100%',
-    height: '100%',
+    width: 130,
+    height: 160,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 4,
+    overflow: 'hidden',
   },
   idPhoto: {
     width: '100%',
@@ -711,17 +733,18 @@ const styles = StyleSheet.create({
   },
   nameContainer: {
     alignItems: 'center',
-    marginBottom: 10,
-    width: '100%',
+    marginBottom: 5,
+    width: '90%',
   },
   nameText: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 4,
     textAlign: 'center',
-    paddingHorizontal: 5,
     width: '100%',
+    flexWrap: 'wrap',
+    fontFamily: 'serif',
   },
   departmentText: {
     fontSize: 16,
@@ -730,26 +753,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 5,
     width: '100%',
+    fontFamily: 'serif',
   },
   barcodeContainer: {
     alignItems: 'center',
-    width: '100%',
+    width: '80%',
     marginTop: 5,
   },
-  qrCodeContainer: {
-    width: 100,
-    height: 100,
+  barcodeFormatContainer: {
+    width: 200,
+    height: 55,
     backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 4,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderStyle: 'dashed',
-    marginBottom: 8,
+    marginBottom: 5,
     overflow: 'hidden',
   },
-  qrCode: {
+  barcodeFormatImage: {
     width: '100%',
     height: '100%',
   },
@@ -767,10 +791,12 @@ const styles = StyleSheet.create({
   },
   barcodeText: {
     fontSize: 16,
-    fontFamily: 'monospace',
+    fontFamily: 'serif',
     fontWeight: 'bold',
-    letterSpacing: 1,
+    letterSpacing: 0,
     color: '#000000',
+    textAlign: 'center',
+    marginTop: 3,
   },
   actionsContainer: {
     flexDirection: 'column',
