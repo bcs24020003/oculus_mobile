@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "UTS Oculus",
+    "slug": "uts-oculus-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/logo.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.uts.oculus",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": true,
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.uts.oculus",
+      "googleServicesFile": "./google-services.json",
+      "softwareKeyboardLayoutMode": "pan"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/logo.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/logo.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "@react-native-firebase/app",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "development": {
+      "developmentClient": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "958eb984-6f68-443b-bdb7-4afcf3d3d618"
+      },
+      "router": {
+        "origin": false
+      }
+    },
+    "owner": "bcs24020003"
+  }
+}
