@@ -14,7 +14,8 @@
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": true,
-        "UIStatusBarStyle": "UIStatusBarStyleLightContent"
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -47,9 +48,6 @@
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "development": {
-      "developmentClient": true
     },
     "extra": {
       "eas": {
